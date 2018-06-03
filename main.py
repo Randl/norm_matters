@@ -17,7 +17,7 @@ from utils.meters import AverageMeter, accuracy
 from utils.optim import OptimRegime
 from datetime import datetime
 from ast import literal_eval
-from torch.nn.utils import clip_grad_norm
+from torch.nn.utils import clip_grad_norm_
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -30,7 +30,9 @@ parser.add_argument('--results_dir', metavar='RESULTS_DIR', default='./results',
 parser.add_argument('--save', metavar='SAVE', default='',
                     help='saved folder')
 parser.add_argument('--dataset', metavar='DATASET', default='imagenet',
-                    help='dataset name or folder')
+                    help='dataset name')
+parser.add_argument('--datapath', metavar='DATAPATH', default=None,
+                    help='dataset folder')
 parser.add_argument('--model', '-a', metavar='MODEL', default='alexnet',
                     choices=model_names,
                     help='model architecture: ' +
@@ -156,10 +158,11 @@ def main():
 
     # define loss function (criterion) and optimizer
     criterion = getattr(model, 'criterion', nn.CrossEntropyLoss)()
+    model = torch.nn.DataParallel(model, args.gpus)
     criterion.type(args.type)
     model.type(args.type)
 
-    val_data = get_dataset(args.dataset, 'val', transform['eval'])
+    val_data = get_dataset(args.dataset, 'val', transform['eval'], datasets_path=args.datapath)
     val_loader = torch.utils.data.DataLoader(
         val_data,
         batch_size=args.batch_size, shuffle=False,
@@ -169,7 +172,7 @@ def main():
         validate(val_loader, model, criterion, 0)
         return
 
-    train_data = get_dataset(args.dataset, 'train', transform['train'])
+    train_data = get_dataset(args.dataset, 'train', transform['train'], datasets_path=args.datapath)
     train_loader = torch.utils.data.DataLoader(
         train_data,
         batch_size=args.batch_size, shuffle=True,
@@ -226,8 +229,6 @@ def main():
 
 
 def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=None):
-    if args.gpus and len(args.gpus) > 1:
-        model = torch.nn.DataParallel(model, args.gpus)
     batch_time = AverageMeter()
     data_time = AverageMeter()
     losses = AverageMeter()
@@ -255,16 +256,16 @@ def forward(data_loader, model, criterion, epoch=0, training=True, optimizer=Non
 
         # measure accuracy and record loss
         prec1, prec5 = accuracy(output.data, target, topk=(1, 5))
-        losses.update(loss.data[0], inputs.size(0))
-        top1.update(prec1[0], inputs.size(0))
-        top5.update(prec5[0], inputs.size(0))
+        losses.update(loss.item(), inputs.size(0))
+        top1.update(prec1.item(), inputs.size(0))
+        top5.update(prec5.item(), inputs.size(0))
 
         if training:
             optimizer.update(epoch, epoch * len(data_loader) + i)
             # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
-            clip_grad_norm(model.parameters(), 5)
+            clip_grad_norm_(model.parameters(), 5)
             optimizer.step()
 
         # measure elapsed time

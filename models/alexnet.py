@@ -29,7 +29,7 @@ class AlexNetOWT_BN(nn.Module):
             nn.ReLU(inplace=True),
             nn.BatchNorm2d(256)
         )
-        self.classifier = nn.Sequential(
+        self.fc = nn.Sequential(
             nn.Linear(256 * 6 * 6, 4096, bias=False),
             nn.BatchNorm1d(4096),
             nn.ReLU(inplace=True),
@@ -70,7 +70,7 @@ class AlexNetOWT_BN(nn.Module):
     def forward(self, x):
         x = self.features(x)
         x = x.view(-1, 256 * 6 * 6)
-        x = self.classifier(x)
+        x = self.fc(x)
         return x
 
 

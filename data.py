@@ -7,7 +7,10 @@ __DATASETS_DEFAULT_PATH = '/home/ehoffer/Datasets/'
 def get_dataset(name, split='train', transform=None,
                 target_transform=None, download=True, datasets_path=__DATASETS_DEFAULT_PATH):
     train = (split == 'train')
-    root = os.path.join(datasets_path, name)
+    if datasets_path is None:
+        root = os.path.join(__DATASETS_DEFAULT_PATH, name)
+    else:
+        root = datasets_path
     if name == 'cifar10':
         return datasets.CIFAR10(root=root,
                                 train=train,
